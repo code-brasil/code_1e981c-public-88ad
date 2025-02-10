@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site de Homenagens</title>
+  <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <header class="p-4 bg-blue-200">
+    <h1 class="text-3xl font-bold">Site de Homenagens</h1>
+    <nav class="mt-2">
+      <a href="admin.html" class="text-blue-700 underline">Painel Administrativo</a>
+    </nav>
+  </header>
+  
+  <main class="p-4">
+    <section class="mb-8">
+      <h2 class="text-2xl font-semibold mb-4">Envie sua Homenagem</h2>
+      <form id="homenagemForm" class="space-y-4">
+        <div>
+          <label for="name" class="block font-medium">Nome</label>
+          <input type="text" id="name" class="border rounded w-full p-2" required>
+        </div>
+        <div>
+          <label for="message" class="block font-medium">Mensagem</label>
+          <textarea id="message" class="border rounded w-full p-2" required></textarea>
+        </div>
+        <div>
+          <label for="date" class="block font-medium">Data</label>
+          <input type="date" id="date" class="border rounded w-full p-2" required>
+        </div>
+        <div>
+          <label for="photo" class="block font-medium">Foto (será convertida para Base64)</label>
+          <input type="file" id="photo" class="border rounded w-full p-2" accept="image/*" required>
+        </div>
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Enviar Homenagem</button>
+      </form>
+      <div id="formResponse" class="mt-4 text-green-600"></div>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-semibold mb-4">Homenagens Aprovadas</h2>
+      <div id="homagesList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </section>
+  </main>
+
+  <script>
+    // Função para converter arquivo para Base64
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    // Envio do formulário
+    document.getElementById('homenagemForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const message = document.getElementById('message').value;
+      const date = document.getElementById('date').value;
+      const photoFile = document.getElementById('photo').files[0];
+      if (!photoFile) {
+        alert('Selecione um arquivo de foto.');
+        return;
+      }
+      const photoBase64 = await fileToBase64(photoFile);
+      
+      const payload = { name, message, date, photo: photoBase64 };
+      
+      const response = await fetch('https://api.greb.com.br/functions/code_1e981c/create_user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      document.getElementById('formResponse').innerText = data.status === 'success' ? 'Homenagem enviada com sucesso!' : data.error || 'Erro no envio';
+      // Opcional: atualizar a lista de homenagens
+      fetchHomages();
+    });
+
+    // Função para buscar homenagens aprovadas
+    async function fetchHomages() {
+      const payload = { action: 'list' };
+      const response = await fetch('https://api.greb.com.br/functions/code_1e981c/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      const container = document.getElementById('homagesList');
+      container.innerHTML = '';
+      if(data.status === 'success' && Array.isArray(data.data)) {
+        data.data.filter(item => item.status === 'approved').forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'bg-white p-4 rounded shadow';
+          card.innerHTML = `<h3 class="text-xl font-bold">${item.name}</h3>
+                            <p>${item.message}</p>
+                            <p class="text-sm text-gray-500">${item.date}</p>
+                            <img src="${item.photo_base64}" alt="Foto da homenagem" class="mt-2 rounded" />`;
+          container.appendChild(card);
+        });
+      } else {
+        container.innerHTML = '<p>Nenhuma homenagem aprovada encontrada.</p>';
+      }
+    }
+
+    // Busca homenagens ao carregar a página
+    fetchHomages();
+  </script>
+</body>
+</html>
